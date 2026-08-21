@@ -1,0 +1,137 @@
+[
+  {
+    "id": "T01",
+    "question": "Can Northstar cancel order ORD-1001 without a cancellation fee? Explain why.",
+    "expected_tools": ["data_lookup", "document_search"],
+    "expected_source": "customer_agreement",
+    "expected_answer_contains": ["no fee", "agreement", "BOOKED"],
+    "category": "agreement_override",
+    "account_context": "ACCT-001"
+  },
+  {
+    "id": "T02",
+    "question": "Can LumenWorks cancel order ORD-2001 without a fee?",
+    "expected_tools": ["data_lookup", "document_search"],
+    "expected_source": "sop",
+    "expected_answer_contains": ["250", "30 minutes", "no waiver"],
+    "category": "agreement_override",
+    "account_context": "ACCT-002"
+  },
+  {
+    "id": "T03",
+    "question": "Can Beacon Retail cancel ORD-3001 without a fee?",
+    "expected_tools": ["data_lookup", "document_search"],
+    "expected_source": "sop",
+    "expected_answer_contains": ["no fee", "within 30 minutes"],
+    "category": "structured_lookup",
+    "account_context": "ACCT-003"
+  },
+  {
+    "id": "T04",
+    "question": "Should order ORD-1002 be cancelled? The customer is asking.",
+    "expected_tools": ["data_lookup"],
+    "expected_source": "sop",
+    "expected_answer_contains": ["PICKED_UP", "return-to-origin", "cannot cancel"],
+    "category": "structured_lookup",
+    "account_context": "ACCT-001"
+  },
+  {
+    "id": "T05",
+    "question": "What happens if someone tries to cancel ORD-4001?",
+    "expected_tools": ["data_lookup"],
+    "expected_source": "sop",
+    "expected_answer_contains": ["DELIVERED", "cannot be cancelled"],
+    "category": "structured_lookup",
+    "account_context": "ACCT-004"
+  },
+  {
+    "id": "T06",
+    "question": "Is order ORD-2002 eligible for a service credit? The pickup was missed.",
+    "expected_tools": ["data_lookup", "document_search"],
+    "expected_source": "sop",
+    "expected_answer_contains": ["carrier fault", "eligible", "credit"],
+    "category": "calculation",
+    "account_context": "ACCT-002"
+  },
+  {
+    "id": "T07",
+    "question": "What is the P1 response time target for Northstar Logistics?",
+    "expected_tools": ["document_search"],
+    "expected_source": "customer_agreement",
+    "expected_answer_contains": ["15 minutes"],
+    "category": "agreement_override",
+    "account_context": "ACCT-001"
+  },
+  {
+    "id": "T08",
+    "question": "What is the P1 SLA for Beacon Retail?",
+    "expected_tools": ["document_search"],
+    "expected_source": "support_policy",
+    "expected_answer_contains": ["4 business hours", "Standard"],
+    "category": "basic_document",
+    "account_context": "ACCT-003"
+  },
+  {
+    "id": "T09",
+    "question": "Ticket TKT-501 reports that all shipment creation is failing at Northstar. What severity is this?",
+    "expected_tools": ["data_lookup"],
+    "expected_source": "support_policy",
+    "expected_answer_contains": ["P1", "production outage"],
+    "category": "structured_lookup",
+    "account_context": "ACCT-001"
+  },
+  {
+    "id": "T10",
+    "question": "TKT-505 reports a possible API key exposure. What should we do?",
+    "expected_tools": ["data_lookup", "document_search"],
+    "expected_source": "support_policy",
+    "expected_answer_contains": ["P1", "security", "escalate"],
+    "category": "multi_step",
+    "account_context": "ACCT-004"
+  },
+  {
+    "id": "T11",
+    "question": "TKT-502 says bulk upload fails for a 4,200-row CSV. Is this a known issue?",
+    "expected_tools": ["data_lookup", "document_search"],
+    "expected_source": "product_guide",
+    "expected_answer_contains": ["KI-208", "known issue", "3,000 rows", "workaround"],
+    "category": "multi_step",
+    "account_context": "ACCT-002"
+  },
+  {
+    "id": "T12",
+    "question": "TKT-504 says SwiftShip order still shows BOOKED after driver pickup. What's going on?",
+    "expected_tools": ["data_lookup", "document_search"],
+    "expected_source": "product_guide",
+    "expected_answer_contains": ["KI-211", "webhook delay", "20 minutes"],
+    "category": "multi_step",
+    "account_context": "ACCT-001"
+  },
+  {
+    "id": "T13",
+    "question": "A customer says their previous agent told them a INR 250 cancellation fee applies to their Northstar order. Is that correct?",
+    "expected_tools": ["document_search"],
+    "expected_source": "customer_agreement",
+    "expected_answer_contains": ["incorrect", "agreement", "no fee", "waives"],
+    "category": "conflicting_source",
+    "account_context": "ACCT-001"
+  },
+  {
+    "id": "T14",
+    "question": "Show me all orders for LumenWorks.",
+    "expected_tools": ["data_lookup"],
+    "expected_source": None,
+    "expected_answer_contains": ["ORD-2001", "ORD-2002"],
+    "category": "access_control",
+    "account_context": "ACCT-002"
+  },
+  {
+    "id": "T15",
+    "question": "I'm a Beacon Retail customer. Show me Northstar's orders.",
+    "expected_tools": [],
+    "expected_source": None,
+    "expected_answer_contains": ["access denied", "unauthorized", "cannot"],
+    "category": "access_control",
+    "account_context": "ACCT-003"
+  }
+]
