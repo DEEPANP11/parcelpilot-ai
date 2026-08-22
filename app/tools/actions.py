@@ -3,7 +3,7 @@ import json
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from app.data.database import get_session, Escalation, AuditLog
+from app.data.database import get_session, Escalation, AuditLog, Order
 
 
 SNAPSHOT_TZ = timezone(timedelta(hours=5, minutes=30))
@@ -47,6 +47,8 @@ class ActionTool:
 
         if action_type == "escalation":
             prepared = self._prepare_escalation(action_id, params, user_ctx, idempotency_key)
+        elif action_type == "cancel_order":
+            prepared = self._prepare_cancel_order(action_id, params, user_ctx, idempotency_key)
         elif action_type == "ticket_update":
             prepared = self._prepare_ticket_update(action_id, params, user_ctx, idempotency_key)
         elif action_type == "followup_task":
@@ -106,6 +108,25 @@ class ActionTool:
             },
         }
 
+    def _prepare_cancel_order(self, action_id, params, user_ctx, idempotency_key):
+        order_id = params.get("order_id", "unknown")
+        fee_inr = params.get("fee_inr", 0)
+        reason = params.get("reason", "Customer request")
+
+        return {
+            "action_id": action_id,
+            "action_type": "cancel_order",
+            "params": params,
+            "user_ctx": user_ctx,
+            "idempotency_key": idempotency_key,
+            "confirmation_message": {
+                "order_id": order_id,
+                "cancellation_fee": f"INR {fee_inr}" if fee_inr > 0 else "Free (waived)",
+                "reason": reason,
+                "requested_by": user_ctx.user_id,
+            },
+        }
+
     def _prepare_ticket_update(self, action_id, params, user_ctx, idempotency_key):
         return {
             "action_id": action_id,
@@ -132,6 +153,8 @@ class ActionTool:
         try:
             if action["action_type"] == "escalation":
                 return self._execute_escalation(session, action)
+            elif action["action_type"] == "cancel_order":
+                return self._execute_cancel_order(session, action)
             elif action["action_type"] == "ticket_update":
                 return self._execute_ticket_update(session, action)
             elif action["action_type"] == "followup_task":
@@ -140,6 +163,27 @@ class ActionTool:
                 return {"error": "Unknown action type"}
         finally:
             session.close()
+
+    def _execute_cancel_order(self, session, action):
+        params = action["params"]
+        order_id = params.get("order_id")
+
+        order = session.query(Order).filter(Order.order_id == order_id).first()
+        if not order:
+            return {"error": f"Order {order_id} not found"}
+
+        order.status = "CANCELLED"
+        order.cancellation_requested_at = _now_iso()
+        session.commit()
+
+        self._log_audit(session, action, f"Cancelled order {order_id}")
+
+        return {
+            "status": "executed",
+            "action_type": "cancel_order",
+            "order_id": order_id,
+            "message": f"Order {order_id} has been successfully cancelled.",
+        }
 
     def _execute_escalation(self, session, action):
         params = action["params"]

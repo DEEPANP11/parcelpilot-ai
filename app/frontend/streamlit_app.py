@@ -51,21 +51,71 @@ with st.sidebar:
         st.session_state.pending_action = None
         st.rerun()
 
+    # Suggested questions
+    st.divider()
+    st.subheader("Try These Questions")
+    suggestions = {
+        "customer": [
+            "How many orders do I have?",
+            "Show order ORD-1001",
+            "Cancel order ORD-1001",
+            "What are the SLA targets?",
+            "Show my tickets",
+            "Request service credit",
+        ],
+        "support": [
+            "Show ticket TKT-501",
+            "Classify severity for TKT-501",
+            "Escalate ticket TKT-501",
+            "Show all open tickets",
+        ],
+        "manager": [
+            "How many orders for Northstar?",
+            "Show all open tickets",
+            "Approve service credit",
+        ],
+    }
+    for q in suggestions.get(role, []):
+        if st.button(q, key=f"suggest_{q}", use_container_width=True):
+            st.session_state.messages.append({"role": "user", "content": q})
+            st.rerun()
+
     if st.session_state.pending_action:
         st.divider()
-        st.warning("Pending Action")
+        st.warning("Pending Action - Confirmation Required")
         pa = st.session_state.pending_action
-        st.json(pa.get("details", {}))
+        details = pa.get("details", pa.get("confirmation_message", {}))
+
+        # Display confirmation details nicely
+        if isinstance(details, dict):
+            if "order_id" in details:
+                st.markdown(f"**Order:** {details['order_id']}")
+                st.markdown(f"**Cancellation Fee:** {details.get('cancellation_fee', 'N/A')}")
+                st.markdown(f"**Reason:** {details.get('reason', 'N/A')}")
+            elif "ticket_id" in details:
+                st.markdown(f"**Ticket:** {details['ticket_id']}")
+                st.markdown(f"**Severity:** {details.get('severity', 'N/A')}")
+                st.markdown(f"**Reason:** {details.get('reason', 'N/A')}")
+            else:
+                st.json(details)
+        else:
+            st.markdown(details)
+
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("Confirm", type="primary"):
-                result = st.session_state.agent.confirm_action(pa["action_id"], True)
-                st.session_state.messages.append({"role": "assistant", "content": result.get("message", "Done"), "tool_activity": ["action_execute"]})
+            if st.button("Yes, Confirm", type="primary", use_container_width=True):
+                action_id = pa.get("action_id")
+                if action_id:
+                    result = st.session_state.agent.confirm_action(action_id, True)
+                    st.session_state.messages.append({"role": "assistant", "content": result.get("message", "Action completed successfully!")})
                 st.session_state.pending_action = None
                 st.rerun()
         with c2:
-            if st.button("Cancel"):
-                st.session_state.agent.confirm_action(pa["action_id"], False)
+            if st.button("No, Cancel", use_container_width=True):
+                action_id = pa.get("action_id")
+                if action_id:
+                    st.session_state.agent.confirm_action(action_id, False)
+                    st.session_state.messages.append({"role": "assistant", "content": "Action cancelled."})
                 st.session_state.pending_action = None
                 st.rerun()
 
@@ -102,6 +152,10 @@ with tab_chat:
                 result = st.session_state.agent.run(prompt, st.session_state.user_ctx)
 
             st.markdown(result["answer"])
+
+            # Store proposed action for confirmation
+            if result.get("proposed_action"):
+                st.session_state.pending_action = result["proposed_action"]
 
             tool_activity = result.get("tools_called", [])
             sources = result.get("sources_cited", [])

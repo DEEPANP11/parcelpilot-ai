@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: parcelpilot-ai
+    env: python
+    buildCommand: pip install -r requirements.txt && python -m app.data.ingest_excel && python -m app.rag.ingest_documents
+    startCommand: streamlit run app/frontend/streamlit_app.py --server.port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
