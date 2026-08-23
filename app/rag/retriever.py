@@ -76,11 +76,15 @@ class HybridRetriever:
             self.all_ids.append(doc_id)
             self.collection_map[doc_id] = "historical"
 
-        # Tokenize for BM25
-        self.tokenized_docs = [
-            doc.lower().split() for doc in self.all_documents
-        ]
-        self.bm25 = BM25Okapi(self.tokenized_docs)
+        # Tokenize for BM25 - handle empty corpus
+        if self.all_documents:
+            self.tokenized_docs = [
+                doc.lower().split() for doc in self.all_documents
+            ]
+            self.bm25 = BM25Okapi(self.tokenized_docs)
+        else:
+            self.tokenized_docs = []
+            self.bm25 = None
 
     def _get_reranker(self):
         """Lazy-load cross-encoder reranker."""
@@ -95,6 +99,10 @@ class HybridRetriever:
 
     def bm25_search(self, query: str, top_k: int = 10) -> list[dict]:
         """BM25 keyword search."""
+        # Handle empty corpus
+        if not self.bm25 or not self.tokenized_docs:
+            return []
+        
         tokenized_query = query.lower().split()
         scores = self.bm25.get_scores(tokenized_query)
 
