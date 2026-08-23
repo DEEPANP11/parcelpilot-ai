@@ -13,15 +13,45 @@ class HybridRetriever:
     """Combines BM25 keyword search + ChromaDB vector search + reranking."""
 
     def __init__(self):
+        # Ensure directory exists
+        CHROMA_DIR.mkdir(parents=True, exist_ok=True)
+        
         self.chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-        self.current_col = self.chroma_client.get_collection(CURRENT_COLLECTION)
-        self.historical_col = self.chroma_client.get_collection(HISTORICAL_COLLECTION)
-
+        
+        # Try to get collections, create if they don't exist
+        try:
+            self.current_col = self.chroma_client.get_collection(CURRENT_COLLECTION)
+        except Exception:
+            self.current_col = self.chroma_client.create_collection(
+                name=CURRENT_COLLECTION,
+                metadata={"description": "Current authoritative documents"}
+            )
+        
+        try:
+            self.historical_col = self.chroma_client.get_collection(HISTORICAL_COLLECTION)
+        except Exception:
+            self.historical_col = self.chroma_client.create_collection(
+                name=HISTORICAL_COLLECTION,
+                metadata={"description": "Historical/context-only documents"}
+            )
+        
+        # Ingest documents if collections are empty
+        if self.current_col.count() == 0 and self.historical_col.count() == 0:
+            self._ingest_documents()
+        
         # Load all documents for BM25
         self._build_bm25_index()
 
         # Lazy-load reranker
         self._reranker = None
+
+    def _ingest_documents(self):
+        """Ingest documents if collections are empty."""
+        try:
+            from app.rag.ingest_documents import ingest_documents
+            ingest_documents()
+        except Exception as e:
+            print(f"Warning: Could not ingest documents: {e}")
 
     def _build_bm25_index(self):
         """Build BM25 index from ChromaDB documents."""

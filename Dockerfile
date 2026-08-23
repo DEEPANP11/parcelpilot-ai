@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies including curl for health check
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
@@ -16,8 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Initialize database and ingest data
-RUN python -m app.data.ingest_excel
-RUN python -m app.rag.ingest_documents
+RUN python scripts/init_data.py
 
 # Expose port
 EXPOSE 8501

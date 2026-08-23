@@ -6,6 +6,30 @@ import streamlit as st
 import json
 from datetime import datetime
 
+# Initialize database and data on first run
+@st.cache_resource
+def initialize_app():
+    """Initialize database and ingest data if needed."""
+    from app.data.database import init_db, get_session, Account
+    from app.data.ingest_excel import run_ingestion
+    
+    # Initialize database tables
+    init_db()
+    
+    # Check if data exists, if not ingest from Excel
+    session = get_session()
+    try:
+        account_count = session.query(Account).count()
+        if account_count == 0:
+            run_ingestion()
+    finally:
+        session.close()
+    
+    return True
+
+# Run initialization
+initialize_app()
+
 from app.agent.graph import ParcelPilotAgent
 from app.data.access_control import UserContext
 

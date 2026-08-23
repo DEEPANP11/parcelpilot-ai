@@ -4,7 +4,10 @@ from sqlalchemy import (
     ForeignKey, DateTime, UniqueConstraint, Constraint
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
-from config.settings import DB_PATH
+from config.settings import DB_PATH, DATA_DIR
+
+# Ensure data directory exists
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 SessionLocal = sessionmaker(bind=engine)
