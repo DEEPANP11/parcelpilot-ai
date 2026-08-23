@@ -37,6 +37,25 @@ if "user_ctx" not in st.session_state:
     st.session_state.user_ctx = None
 if "pending_action" not in st.session_state:
     st.session_state.pending_action = None
+if "suggested_query" not in st.session_state:
+    st.session_state.suggested_query = None
+
+def process_query(query):
+    """Process a query through the agent and add to messages."""
+    st.session_state.messages.append({"role": "user", "content": query})
+    result = st.session_state.agent.run(query, st.session_state.user_ctx)
+    
+    tool_activity = result.get("tools_called", [])
+    sources = result.get("sources_cited", [])
+    gates = result.get("confidence_gates", [])
+    
+    if result.get("proposed_action"):
+        st.session_state.pending_action = result["proposed_action"]
+    
+    st.session_state.messages.append({
+        "role": "assistant", "content": result["answer"],
+        "tool_activity": tool_activity, "sources": sources, "gates": gates,
+    })
 
 # Sidebar
 with st.sidebar:
@@ -67,6 +86,7 @@ with st.sidebar:
     if st.button("Clear Chat"):
         st.session_state.messages = []
         st.session_state.pending_action = None
+        st.session_state.suggested_query = None
         st.rerun()
 
     # Suggested questions
@@ -95,7 +115,7 @@ with st.sidebar:
     }
     for q in suggestions.get(role, []):
         if st.button(q, key=f"suggest_{q}", use_container_width=True):
-            st.session_state.messages.append({"role": "user", "content": q})
+            st.session_state.suggested_query = q
             st.rerun()
 
     if st.session_state.pending_action:
@@ -134,6 +154,13 @@ with st.sidebar:
                 st.session_state.pending_action = None
                 st.rerun()
 
+# Process suggested query if pending
+if st.session_state.suggested_query:
+    query = st.session_state.suggested_query
+    st.session_state.suggested_query = None
+    process_query(query)
+    st.rerun()
+
 # Tabs
 tab_chat, tab_dashboard = st.tabs(["AI Support Chat", "Operations Dashboard"])
 
@@ -158,41 +185,8 @@ with tab_chat:
                         st.markdown(f"- [{status}] {gate.get('gate', 'unknown')}")
 
     if prompt := st.chat_input("Ask ParcelPilot AI..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                result = st.session_state.agent.run(prompt, st.session_state.user_ctx)
-
-            st.markdown(result["answer"])
-
-            if result.get("proposed_action"):
-                st.session_state.pending_action = result["proposed_action"]
-
-            tool_activity = result.get("tools_called", [])
-            sources = result.get("sources_cited", [])
-            gates = result.get("confidence_gates", [])
-
-            if tool_activity:
-                with st.expander("Tool Activity", expanded=False):
-                    for tool in tool_activity:
-                        st.markdown(f"- {tool}")
-            if sources:
-                with st.expander("Sources", expanded=False):
-                    for src in sources:
-                        st.markdown(f"- {src}")
-            if gates:
-                with st.expander("Confidence Gates", expanded=False):
-                    for gate in gates:
-                        status = "PASS" if gate.get("passed") else "FAIL"
-                        st.markdown(f"- [{status}] {gate.get('gate', 'unknown')}")
-
-            st.session_state.messages.append({
-                "role": "assistant", "content": result["answer"],
-                "tool_activity": tool_activity, "sources": sources, "gates": gates,
-            })
+        process_query(prompt)
+        st.rerun()
 
 with tab_dashboard:
     st.header("Operations Intelligence Dashboard")
