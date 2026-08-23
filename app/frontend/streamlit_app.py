@@ -6,34 +6,28 @@ import streamlit as st
 import json
 from datetime import datetime
 
-# Initialize database and data on first run
-@st.cache_resource
-def initialize_app():
-    """Initialize database and ingest data if needed."""
-    from app.data.database import init_db, get_session, Account
-    from app.data.ingest_excel import run_ingestion
-    
-    # Initialize database tables
-    init_db()
-    
-    # Check if data exists, if not ingest from Excel
-    session = get_session()
-    try:
-        account_count = session.query(Account).count()
-        if account_count == 0:
-            run_ingestion()
-    finally:
-        session.close()
-    
-    return True
-
-# Run initialization
-initialize_app()
-
 from app.agent.graph import ParcelPilotAgent
 from app.data.access_control import UserContext
 
 st.set_page_config(page_title="ParcelPilot AI Support", page_icon="📦", layout="wide")
+
+# Initialize database
+@st.cache_resource
+def init_database():
+    from app.data.database import init_db
+    from app.data.access_control import get_session, Account
+    init_db()
+    session = get_session()
+    try:
+        count = session.query(Account).count()
+        if count == 0:
+            from app.data.ingest_excel import run_ingestion
+            run_ingestion()
+    finally:
+        session.close()
+    return True
+
+init_database()
 
 if "agent" not in st.session_state:
     st.session_state.agent = ParcelPilotAgent()
@@ -110,16 +104,13 @@ with st.sidebar:
         pa = st.session_state.pending_action
         details = pa.get("details", pa.get("confirmation_message", {}))
 
-        # Display confirmation details nicely
         if isinstance(details, dict):
             if "order_id" in details:
                 st.markdown(f"**Order:** {details['order_id']}")
                 st.markdown(f"**Cancellation Fee:** {details.get('cancellation_fee', 'N/A')}")
-                st.markdown(f"**Reason:** {details.get('reason', 'N/A')}")
             elif "ticket_id" in details:
                 st.markdown(f"**Ticket:** {details['ticket_id']}")
                 st.markdown(f"**Severity:** {details.get('severity', 'N/A')}")
-                st.markdown(f"**Reason:** {details.get('reason', 'N/A')}")
             else:
                 st.json(details)
         else:
@@ -131,7 +122,7 @@ with st.sidebar:
                 action_id = pa.get("action_id")
                 if action_id:
                     result = st.session_state.agent.confirm_action(action_id, True)
-                    st.session_state.messages.append({"role": "assistant", "content": result.get("message", "Action completed successfully!")})
+                    st.session_state.messages.append({"role": "assistant", "content": result.get("message", "Done!")})
                 st.session_state.pending_action = None
                 st.rerun()
         with c2:
@@ -177,7 +168,6 @@ with tab_chat:
 
             st.markdown(result["answer"])
 
-            # Store proposed action for confirmation
             if result.get("proposed_action"):
                 st.session_state.pending_action = result["proposed_action"]
 
@@ -198,14 +188,6 @@ with tab_chat:
                     for gate in gates:
                         status = "PASS" if gate.get("passed") else "FAIL"
                         st.markdown(f"- [{status}] {gate.get('gate', 'unknown')}")
-
-            auth = result.get("retrieved_docs", {})
-            if auth and auth.get("authority"):
-                with st.expander("Authority Resolution", expanded=False):
-                    a = auth["authority"]
-                    st.markdown(f"**Source:** {a.get('source_name', 'N/A')}")
-                    st.markdown(f"**Type:** {a.get('source_type', 'N/A')}")
-                    st.markdown(f"**Confidence:** {a.get('confidence', 'N/A')}")
 
             st.session_state.messages.append({
                 "role": "assistant", "content": result["answer"],
@@ -249,14 +231,13 @@ with tab_dashboard:
                 st.markdown(f"**Created:** {t.created_at}")
                 st.markdown(f"**Description:** {t.description}")
 
-                # Check known issues
                 desc_lower = (t.description or "").lower()
                 if "bulk upload" in desc_lower or "csv" in desc_lower:
-                    st.warning("Related to KI-208: Bulk Upload failures on large CSVs. Workaround: split files below 3,000 rows.")
+                    st.warning("Related to KI-208: Bulk Upload failures on large CSVs.")
                 if "swiftship" in desc_lower and "booked" in desc_lower:
-                    st.warning("Related to KI-211: SwiftShip pickup webhook delay up to 20 minutes.")
-                if "api key" in desc_lower or "credential" in desc_lower or "security" in desc_lower:
-                    st.error("Security incident - P1 priority. Escalate immediately.")
+                    st.warning("Related to KI-211: SwiftShip pickup webhook delay.")
+                if "api key" in desc_lower or "credential" in desc_lower:
+                    st.error("Security incident - P1 priority.")
 
         st.divider()
         st.subheader("Order Overview")
@@ -273,15 +254,10 @@ with tab_dashboard:
                 st.markdown(f"**Status:** :{status_color}[{o.status}]")
                 st.markdown(f"**Fee:** INR {o.shipment_fee_inr}")
                 st.markdown(f"**Booked:** {o.booked_at}")
-                st.markdown(f"**Pickup Window:** {o.pickup_window_start} to {o.pickup_window_end}")
-                if o.pickup_actual_at:
-                    st.markdown(f"**Actual Pickup:** {o.pickup_actual_at}")
                 if o.carrier_fault:
                     st.error("Carrier at fault")
                 if o.customer_fault:
                     st.warning("Customer at fault")
-                if o.notes:
-                    st.caption(o.notes)
 
     finally:
         session.close()
